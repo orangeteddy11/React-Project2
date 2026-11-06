@@ -1,4 +1,4 @@
-// AdvancedJS.js: the "Extension" page. Shows the statement of authenticity and five
+// AdvancedJS.js: the "Extension" page. Shows the statement of authenticity and the
 // advanced JavaScript demos, each with a description and a working example.
 // The bookings are loaded from Supabase once here and shared with the demos that need them.
 import { useState, useEffect } from 'react';
@@ -8,6 +8,7 @@ import RepairCalendar from './RepairCalendar';
 import DragDropCourtesy from './DragDropCourtesy';
 import RepairStatus from './RepairStatus';
 import ExportCsv from './ExportCsv';
+import UploadFile from './UploadFile';
 
 // The demos: title, description, JS techniques used, and the component to show
 const demos = [
@@ -74,6 +75,19 @@ const demos = [
       'Building CSV text with map() and join(), escaping quotes and commas',
       'Programmatic file download using a temporary link element',
       'Filtering the data before it is exported'
+    ]
+  },
+  {
+    id: 6,
+    title: 'Upload repair photos',
+    needsData: false,
+    Component: UploadFile,
+    description: 'Lets staff or customers upload a photo of the damaged phone to cloud storage. The chosen image is previewed before it is uploaded, and a gallery shows every photo stored so far, each with a public link.',
+    techniques: [
+      'Supabase Storage upload and public URL APIs with async/await',
+      'URL.createObjectURL to preview a file before uploading',
+      'File validation (image type and size limit) and safe file names',
+      'Listing the files in a storage bucket to build a gallery'
     ]
   }
 ];
