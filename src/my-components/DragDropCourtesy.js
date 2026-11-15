@@ -1,5 +1,6 @@
-// DragDropCourtesy.js: choose a courtesy phone and charger by dragging them into the borrow box.
-// Uses the HTML5 Drag and Drop API. Clicking an item also adds it (for touch screens).
+// DragDropCourtesy.js: choose a courtesy phone and charger by dragging them between
+// two drop zones ("Available" and "Selected"). Uses the HTML5 Drag and Drop API.
+// Clicking an item also moves it, so it works on touch screens too.
 import { useState } from 'react';
 
 // Courtesy items and bond amounts (same list as the booking form)
@@ -16,92 +17,119 @@ const courtesyList = [
   { id: 10, type: 'charger', name: 'Xiaomi Charger', bond: 25 }
 ];
 
-function DragDropCourtesy() {
-  const [borrowed, setBorrowed] = useState([]);
-  const [customerType, setCustomerType] = useState('customer');
+// One drop zone with its draggable items
+function DropZone({ title, hint, items, zone, priceOf, onDrop, onDragStart, onItemClick }) {
   const [dragOver, setDragOver] = useState(false);
+
+  return (
+    <div
+      // preventDefault on dragOver is required, browsers block dropping by default
+      onDragOver={e => { e.preventDefault(); setDragOver(true); }}
+      onDragLeave={() => setDragOver(false)}
+      onDrop={e => { setDragOver(false); onDrop(e, zone); }}
+      className={`rounded p-3 h-100 text-dark ${dragOver ? 'bg-warning-subtle' : 'bg-light'}`}
+      style={{ minHeight: '260px', border: '2px dashed #888' }}
+    >
+      <h6 className="fw-bold">{title}</h6>
+      {items.length === 0 && <p className="text-muted small m-0">{hint}</p>}
+      {items.map(item => (
+        <div
+          key={item.id}
+          draggable
+          onDragStart={e => onDragStart(e, item, zone)}
+          onClick={() => onItemClick(item, zone)}
+          className="d-flex justify-content-between bg-white border rounded px-2 py-1 mb-2"
+          style={{ cursor: 'grab' }}
+        >
+          <span>{item.name}</span>
+          <span>${priceOf(item).toFixed(2)}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function DragDropCourtesy() {
+  const [selected, setSelected] = useState([]);
+  const [customerType, setCustomerType] = useState('customer');
+  const [message, setMessage] = useState('');
+
+  // Items not yet selected stay in the "Available" zone
+  const available = courtesyList.filter(item => !selected.some(s => s.id === item.id));
 
   // Business customers pay no bond
   const priceOf = (item) => (customerType === 'business' ? 0 : item.bond);
-  const totalBond = borrowed.reduce((sum, item) => sum + priceOf(item), 0);
+  const totalBond = selected.reduce((sum, item) => sum + priceOf(item), 0);
 
-  // Only one phone and one charger: a new item replaces the old one of the same type
-  const borrow = (item) => {
-    setBorrowed(prev => [...prev.filter(i => i.type !== item.type), item].sort((a, b) => a.id - b.id));
+  // Move an item to the other zone. Only one phone and one charger can be selected.
+  const moveItem = (item, source, target) => {
+    if (source === target) return;
+    if (target === 'selected') {
+      if (selected.some(s => s.type === item.type)) {
+        setMessage(`You can only select one ${item.type}. Drag the current one back first.`);
+        return;
+      }
+      setSelected(prev => [...prev, item].sort((a, b) => a.id - b.id));
+    } else {
+      setSelected(prev => prev.filter(s => s.id !== item.id));
+    }
+    setMessage('');
   };
 
-  const remove = (id) => setBorrowed(prev => prev.filter(i => i.id !== id));
-
-  // Remember which item is being dragged
-  const onDragStart = (event, item) => {
-    event.dataTransfer.setData('text/plain', String(item.id));
+  // Remember which item is being dragged and which zone it came from
+  const handleDragStart = (event, item, source) => {
+    event.dataTransfer.setData('application/json', JSON.stringify({ id: item.id, source }));
   };
 
-  // Dropping on the borrow box adds the dragged item
-  const onDrop = (event) => {
+  // Read the dragged item back and move it into the zone it was dropped on
+  const handleDrop = (event, target) => {
     event.preventDefault();
-    setDragOver(false);
-    const item = courtesyList.find(i => i.id === Number(event.dataTransfer.getData('text/plain')));
-    if (item) borrow(item);
+    const raw = event.dataTransfer.getData('application/json');
+    if (!raw) return;
+    const { id, source } = JSON.parse(raw);
+    const item = courtesyList.find(i => i.id === id);
+    if (item) moveItem(item, source, target);
   };
 
-  // Item cards for one type (phone or charger)
-  const itemList = (type, title) => (
-    <div className="mb-3">
-      <h6>{title}</h6>
-      <div className="d-flex flex-wrap">
-        {courtesyList.filter(item => item.type === type).map(item => (
-          <div
-            key={item.id}
-            draggable
-            onDragStart={e => onDragStart(e, item)}
-            onClick={() => borrow(item)}
-            className="bg-white text-dark border rounded px-2 py-1 me-2 mb-2"
-            style={{ cursor: 'grab' }}
-          >
-            {item.name} <span className="text-muted small">${priceOf(item)}</span>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
+  // Click fallback: move the item to the opposite zone
+  const handleClick = (item, zone) => moveItem(item, zone, zone === 'available' ? 'selected' : 'available');
 
   return (<>
-    <div className="mb-3">
+    <div className="d-flex flex-wrap align-items-center mb-2">
       <label className="me-2">Customer type:</label>
-      <select className="form-select d-inline-block w-auto" value={customerType} onChange={e => setCustomerType(e.target.value)}>
+      <select className="form-select w-auto me-3" value={customerType} onChange={e => setCustomerType(e.target.value)}>
         <option value="customer">Customer</option>
         <option value="business">Business</option>
       </select>
+      <span className="fw-bold">Total bond: ${totalBond.toFixed(2)}</span>
     </div>
+    <p className="small mb-2">Drag one phone and/or one charger into "Selected". Drag it back to remove it.</p>
+    {message && <p className="bg-warning text-dark rounded px-2 py-1">{message}</p>}
+
     <div className="row g-3">
-      <div className="col-12 col-lg-6">
-        {itemList('phone', 'Phones (drag one into the box)')}
-        {itemList('charger', 'Chargers (drag one into the box)')}
+      <div className="col-12 col-md-6">
+        <DropZone
+          title="Available"
+          hint="Everything is selected."
+          items={available}
+          zone="available"
+          priceOf={priceOf}
+          onDrop={handleDrop}
+          onDragStart={handleDragStart}
+          onItemClick={handleClick}
+        />
       </div>
-      <div className="col-12 col-lg-6">
-        <h6>Borrow box</h6>
-        {/* Drop zone: preventDefault on dragOver is required to allow dropping */}
-        <div
-          onDragOver={e => { e.preventDefault(); setDragOver(true); }}
-          onDragLeave={() => setDragOver(false)}
-          onDrop={onDrop}
-          className={`rounded p-3 border border-2 ${dragOver ? 'border-warning bg-warning-subtle' : 'border-light'}`}
-          style={{ minHeight: '150px', borderStyle: 'dashed' }}
-        >
-          {borrowed.length === 0 ? (
-            <span className="text-light">Drop items here</span>
-          ) : borrowed.map(item => (
-            <div key={item.id} className="d-flex justify-content-between bg-white text-dark rounded px-2 py-1 mb-1">
-              <span>{item.name}</span>
-              <span>
-                ${priceOf(item).toFixed(2)}
-                <button type="button" className="btn btn-sm btn-outline-danger ms-2 py-0" onClick={() => remove(item.id)}>X</button>
-              </span>
-            </div>
-          ))}
-        </div>
-        <p className="mt-2 fw-bold">Bond total: ${totalBond.toFixed(2)}</p>
+      <div className="col-12 col-md-6">
+        <DropZone
+          title="Selected"
+          hint="Drop items here."
+          items={selected}
+          zone="selected"
+          priceOf={priceOf}
+          onDrop={handleDrop}
+          onDragStart={handleDragStart}
+          onItemClick={handleClick}
+        />
       </div>
     </div>
   </>);
