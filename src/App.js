@@ -1,5 +1,4 @@
 // App.js: root component. Sets up the shared layout (Header/Footer) and the page routes.
-// HashRouter is used so the routes also work on GitHub Pages.
 import './App.css';
 import Header from './my-components/Header';
 import Footer from './my-components/Footer';
@@ -8,11 +7,11 @@ import AdvancedJS from './my-components/AdvancedJS';
 import FAQ from './my-components/FAQ';
 import Invoice from './my-components/Invoice';
 import Bookings from './my-components/Bookings';
-import { HashRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 
 function App() {
   return (
-    <HashRouter>
+    <BrowserRouter>
       <Header />
       {/* Only the matching route is rendered between the header and footer */}
       <Routes>
@@ -25,7 +24,7 @@ function App() {
         <Route path="/repairbookingsheet" element={<Navigate to="/" replace />} />
       </Routes>
       <Footer />
-    </HashRouter>
+    </BrowserRouter>
   );
 }
 
